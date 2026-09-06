@@ -1,0 +1,18 @@
+# Real church material — never commit these. Keep your own template deck,
+# hymnal PDF, and song library outside version control (or in a private repo).
+*.pptx
+!reference/example-template.pptx
+*.pdf
+!reference/example-hymnal.pdf
+songs.json
+song-library.json
+!reference/song-library.example.json
+!examples/songs.example.json
+
+# Build output
+build/
+examples/example-output.pptx
+
+__pycache__/
+*.pyc
+.DS_Store

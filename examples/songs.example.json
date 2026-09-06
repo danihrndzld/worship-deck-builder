@@ -1,0 +1,15 @@
+{
+  "_comment": "Example build spec using the synthetic reference/ files. Copy this file, point template/hymnal/library at your own real files, and edit items to match your week's song list.",
+  "template": "../reference/example-template.pptx",
+  "hymnal": "../reference/example-hymnal.pdf",
+  "library": "../reference/song-library.example.json",
+  "output": "example-output.pptx",
+  "title_slide_index": 4,
+  "lyric_slide_index": 5,
+  "items": [
+    { "op": "clone_range", "start": 1, "end": 3 },
+    { "op": "hymn", "title": "Canto de Ejemplo Uno", "himno": 1, "verse_chunk_size": 2, "chorus_chunk_size": 2 },
+    { "op": "library_song", "key": "cancion-de-ejemplo" },
+    { "op": "hymn", "title": "Canto de Ejemplo Dos", "himno": 2, "verse_chunk_size": 2, "chorus_chunk_size": "whole" }
+  ]
+}

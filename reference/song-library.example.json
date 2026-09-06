@@ -1,0 +1,41 @@
+{
+  "_comment": "Example structure for a church-owned contemporary-song library. Keys are your own short IDs. All text below is an original placeholder written for this repo -- replace it with your own church's actual song text (typed in by your team, or exported from a licensed source like CCLI SongSelect), never with lyrics copied from a generic lyrics-aggregator website.",
+
+  "cancion-de-ejemplo": {
+    "title_lines": ["Cancion", "De Ejemplo"],
+    "subtitle_lines": [],
+    "chunk_size": 2,
+    "sections": [
+      {
+        "type": "verse",
+        "lines": [
+          "Primera linea de la estrofa de ejemplo,",
+          "segunda linea de la estrofa de ejemplo,",
+          "tercera linea de la estrofa de ejemplo,",
+          "cuarta linea de la estrofa de ejemplo."
+        ]
+      },
+      {
+        "type": "chorus",
+        "lines": [
+          "Primera linea del coro de ejemplo,",
+          "segunda linea del coro de ejemplo."
+        ]
+      },
+      {
+        "type": "verse",
+        "lines": [
+          "Primera linea de la segunda estrofa,",
+          "segunda linea de la segunda estrofa."
+        ]
+      },
+      {
+        "type": "chorus",
+        "lines": [
+          "Primera linea del coro de ejemplo,",
+          "segunda linea del coro de ejemplo."
+        ]
+      }
+    ]
+  }
+}
