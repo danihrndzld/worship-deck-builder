@@ -1,5 +1,31 @@
 # worship-deck-builder
 
+## Install
+
+Paste this into a Claude Code chat:
+
+```
+Install the worship-deck-builder skill:
+1. Clone https://github.com/danihrndzld/worship-deck-builder into ~/.claude/skills/worship-deck-builder
+2. Ask me for the path to my church's hymnal PDF and my most recent service PPTX
+3. Copy those two files into that skill's reference/ folder as reference/hymnal.pdf
+   and reference/style-template.pptx (leave the example-*.pdf/pptx placeholders as they are)
+4. Run `pip install -r requirements.txt` inside the installed skill folder
+5. Confirm the skill is installed and tell me how to call it
+```
+
+Claude will clone the repo, copy your two real files into the *local* install
+only (they're gitignored, so they never get committed or pushed anywhere),
+install the Python dependencies, and confirm it's ready.
+
+## How to call it
+
+- Explicitly: `/worship-deck-builder`
+- Naturally: just ask, e.g. "build the Sunday slides", "update the service
+  deck with this week's songs", or "pull the lyrics for Himno 64 from the
+  himnario" — Claude matches these against the `description` in `SKILL.md`
+  and loads the skill on its own.
+
 A Claude Code skill (and standalone Python script) that rebuilds a church
 Sunday-service slide deck from a song list. It clones the real slide shapes
 (backgrounds, fonts, logo, positions) from a previous week's PPTX and pulls
@@ -52,12 +78,12 @@ aggregators, and the text on them is frequently wrong: bad verse order,
 missing repeats, typos. Neither the license question nor the accuracy
 question gets better by automating the fetch.
 
-## Install
+## Other ways to install
 
 **As a Claude Code skill (personal, all projects):**
 
 ```bash
-git clone https://github.com/<you>/worship-deck-builder ~/.claude/skills/worship-deck-builder
+git clone https://github.com/danihrndzld/worship-deck-builder ~/.claude/skills/worship-deck-builder
 ```
 
 Claude will pick it up next session. Ask it to "build the Sunday slides"
@@ -66,13 +92,13 @@ and it'll read `SKILL.md` and follow the workflow there.
 **As a project skill (one repo only):**
 
 ```bash
-git clone https://github.com/<you>/worship-deck-builder .claude/skills/worship-deck-builder
+git clone https://github.com/danihrndzld/worship-deck-builder .claude/skills/worship-deck-builder
 ```
 
 **As a standalone script (no Claude Code):**
 
 ```bash
-git clone https://github.com/<you>/worship-deck-builder
+git clone https://github.com/danihrndzld/worship-deck-builder
 cd worship-deck-builder
 pip install -r requirements.txt
 ```
