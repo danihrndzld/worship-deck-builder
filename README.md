@@ -26,21 +26,6 @@ install the Python dependencies, and confirm it's ready.
   himnario" — Claude matches these against the `description` in `SKILL.md`
   and loads the skill on its own.
 
-This is built as a single-purpose skill for one church: once installed, it
-always builds from *your* `reference/hymnal.pdf` and `reference/style-template.pptx`
-by default — no path to remember or pass in each week.
-
-A Claude Code skill (and standalone Python script) that rebuilds a church
-Sunday-service slide deck from a song list. It clones the real slide shapes
-(backgrounds, fonts, logo, positions) from a previous week's PPTX and pulls
-hymn text out of your church's hymnal PDF, instead of someone re-typing verses
-into a blank slide by hand every week.
-
-This came out of reverse-engineering two real weeks of an actual church's
-decks: same theme, same 8 background images, same slide shapes, week after
-week, with only the songs changing. `SKILL.md` and `reference/slide-types.md`
-document what that inspection found.
-
 ## What it actually does
 
 - Clones a slide's shape XML (background image, logo, text box position, font,
