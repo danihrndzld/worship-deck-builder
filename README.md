@@ -5,8 +5,8 @@
 Paste this into a Claude Code chat:
 
 ```
-Install the worship-deck-builder skill:
-1. Clone https://github.com/danihrndzld/worship-deck-builder into ~/.claude/skills/worship-deck-builder
+Install the ppt skill:
+1. Clone https://github.com/danihrndzld/worship-deck-builder into ~/.claude/skills/ppt
 2. Ask me for the path to my church's hymnal PDF and my most recent service PPTX
 3. Copy those two files into that skill's reference/ folder as reference/hymnal.pdf
    and reference/style-template.pptx (leave the example-*.pdf/pptx placeholders as they are)
@@ -20,11 +20,15 @@ install the Python dependencies, and confirm it's ready.
 
 ## How to call it
 
-- Explicitly: `/worship-deck-builder`
+- Explicitly: `/ppt`
 - Naturally: just ask, e.g. "build the Sunday slides", "update the service
   deck with this week's songs", or "pull the lyrics for Himno 64 from the
   himnario" — Claude matches these against the `description` in `SKILL.md`
   and loads the skill on its own.
+
+This is built as a single-purpose skill for one church: once installed, it
+always builds from *your* `reference/hymnal.pdf` and `reference/style-template.pptx`
+by default — no path to remember or pass in each week.
 
 A Claude Code skill (and standalone Python script) that rebuilds a church
 Sunday-service slide deck from a song list. It clones the real slide shapes
@@ -83,7 +87,7 @@ question gets better by automating the fetch.
 **As a Claude Code skill (personal, all projects):**
 
 ```bash
-git clone https://github.com/danihrndzld/worship-deck-builder ~/.claude/skills/worship-deck-builder
+git clone https://github.com/danihrndzld/worship-deck-builder ~/.claude/skills/ppt
 ```
 
 Claude will pick it up next session. Ask it to "build the Sunday slides"
@@ -92,7 +96,7 @@ and it'll read `SKILL.md` and follow the workflow there.
 **As a project skill (one repo only):**
 
 ```bash
-git clone https://github.com/danihrndzld/worship-deck-builder .claude/skills/worship-deck-builder
+git clone https://github.com/danihrndzld/worship-deck-builder .claude/skills/ppt
 ```
 
 **As a standalone script (no Claude Code):**
@@ -105,22 +109,24 @@ pip install -r requirements.txt
 
 ## Use
 
-1. Copy `examples/songs.example.json` and point it at your own files:
-   - `template`: last week's real PPTX (or any deck with the styling you want).
-   - `hymnal`: your church's real hymnal PDF.
-   - `library`: a JSON file of your own contemporary songs — copy
-     `reference/song-library.example.json` as a starting shape.
-2. List this week's songs under `items` — `hymn` for anything in the hymnal
-   (by hymn number), `library_song` for anything in your library (by key),
-   `clone_range` for anything you're reusing unchanged from a past deck
-   (intro slides, the purpose statement, a scripture reading).
-3. Build it:
+1. `template` and `hymnal` don't need to be set — they default to
+   `reference/style-template.pptx` and `reference/hymnal.pdf`, the two real files
+   the install step copied in. Only set them in a spec if a particular build needs
+   a different source.
+2. If you have contemporary (non-hymnal) songs, add them to
+   `reference/song-library.json` (copy `reference/song-library.example.json` for
+   the shape) — this also defaults automatically once it exists.
+3. Write this week's `songs.json`, listing songs under `items` — `hymn` for
+   anything in the hymnal (by hymn number), `library_song` for anything in your
+   library (by key), `clone_range` for anything you're reusing unchanged from a
+   past deck (intro slides, the purpose statement, a scripture reading).
+4. Build it:
 
    ```bash
    python3 scripts/pptx_deck_builder.py build --spec songs.json
    ```
 
-4. Open the output (or render it with `soffice --headless --convert-to pdf
+5. Open the output (or render it with `soffice --headless --convert-to pdf
    your-deck.pptx` and check the PDF) before Sunday. The line-chunking
    heuristic and any brand-new song entries are worth a human glance.
 

@@ -25,6 +25,11 @@ from pptx import Presentation
 from pptx.oxml.ns import qn
 from pypdf import PdfReader
 
+SKILL_DIR = Path(__file__).resolve().parent.parent
+DEFAULT_TEMPLATE = SKILL_DIR / "reference" / "style-template.pptx"
+DEFAULT_HYMNAL = SKILL_DIR / "reference" / "hymnal.pdf"
+DEFAULT_LIBRARY = SKILL_DIR / "reference" / "song-library.json"
+
 VERSE_RE = re.compile(r"^\s*(\d+)\s+(.*\S)\s*$")
 CHORUS_RE = re.compile(r"^\s*coro[.:-]*\s*(.*)$", re.IGNORECASE)
 CREDIT_RE = re.compile(r"^\s*-\s*\S")  # trailing "-Tr. X." / "-Ejemplo." credit line
@@ -244,18 +249,35 @@ def detect_template_slides(prs, title_index=None, lyric_index=None):
 # Build driver
 # --------------------------------------------------------------------------
 
+def resolve_default(spec_value, default_path, label):
+    if spec_value:
+        return spec_value
+    if not default_path.exists():
+        raise SystemExit(
+            f"No {label!r} given in the spec, and the default "
+            f"{default_path} doesn't exist. This skill is set up for a "
+            f"single church's own files -- put your real {label} there, "
+            f"or pass an explicit {label!r} path in the spec."
+        )
+    return str(default_path)
+
+
 def build(spec_path):
     spec = json.loads(Path(spec_path).read_text(encoding="utf-8"))
-    template = Presentation(spec["template"])
+    template_path = resolve_default(spec.get("template"), DEFAULT_TEMPLATE, "template")
+    hymnal_path = resolve_default(spec.get("hymnal"), DEFAULT_HYMNAL, "hymnal")
+    library_path = spec.get("library") or (str(DEFAULT_LIBRARY) if DEFAULT_LIBRARY.exists() else None)
+
+    template = Presentation(template_path)
     title_slide, lyric_slide = detect_template_slides(
         template, spec.get("title_slide_index"), spec.get("lyric_slide_index")
     )
 
-    target = Presentation(spec["template"])
+    target = Presentation(template_path)
     delete_all_slides(target)
 
-    library = load_library(spec.get("library"))
-    source_cache = {spec["template"]: template}
+    library = load_library(library_path)
+    source_cache = {template_path: template}
 
     def get_source(path):
         if path not in source_cache:
@@ -265,14 +287,14 @@ def build(spec_path):
     for item in spec["items"]:
         op = item["op"]
         if op == "clone_range":
-            source = get_source(item.get("source", spec["template"]))
+            source = get_source(item.get("source", template_path))
             src_slides = list(source.slides)
             for idx in range(item["start"] - 1, item["end"]):
                 clone_slide(src_slides[idx], target)
 
         elif op == "hymn":
             page_no = item["himno"]
-            raw = hymn_page_text(spec["hymnal"], page_no)
+            raw = hymn_page_text(hymnal_path, page_no)
             parsed = parse_hymn(raw)
             sections = hymn_sections(
                 parsed,
@@ -303,7 +325,7 @@ def main():
     b.add_argument("--spec", required=True, help="Path to songs.json (see examples/songs.example.json)")
 
     h = sub.add_parser("hymn", help="Look up and print one hymn's parsed text (debug helper)")
-    h.add_argument("--hymnal", required=True)
+    h.add_argument("--hymnal", default=None, help=f"Defaults to {DEFAULT_HYMNAL}")
     h.add_argument("--page", type=int, required=True, help="Page number (often == hymn number)")
 
     args = parser.parse_args()
@@ -311,7 +333,8 @@ def main():
     if args.command == "build":
         build(args.spec)
     elif args.command == "hymn":
-        raw = hymn_page_text(args.hymnal, args.page)
+        hymnal_path = resolve_default(args.hymnal, DEFAULT_HYMNAL, "hymnal")
+        raw = hymn_page_text(hymnal_path, args.page)
         parsed = parse_hymn(raw)
         print(json.dumps(parsed, ensure_ascii=False, indent=2))
 
