@@ -109,7 +109,7 @@ church's own reference files, not a generic path you pass in each time.
 ## Script usage
 
 ```
-pip install -r requirements.txt
+uv pip install -r requirements.txt
 python3 scripts/pptx_deck_builder.py build --spec songs.json
 python3 scripts/pptx_deck_builder.py hymn --page 64   # debug helper, reads reference/hymnal.pdf
 ```

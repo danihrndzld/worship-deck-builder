@@ -10,7 +10,7 @@ Install the ppt skill:
 2. Ask me for the path to my church's hymnal PDF and my most recent service PPTX
 3. Copy those two files into that skill's reference/ folder as reference/hymnal.pdf
    and reference/style-template.pptx (leave the example-*.pdf/pptx placeholders as they are)
-4. Run `pip install -r requirements.txt` inside the installed skill folder
+4. Run `uv pip install -r requirements.txt` inside the installed skill folder
 5. Confirm the skill is installed and tell me how to call it
 ```
 
@@ -89,7 +89,7 @@ git clone https://github.com/danihrndzld/worship-deck-builder .claude/skills/ppt
 ```bash
 git clone https://github.com/danihrndzld/worship-deck-builder
 cd worship-deck-builder
-pip install -r requirements.txt
+uv pip install -r requirements.txt
 ```
 
 ## Use
