@@ -1,15 +1,23 @@
 {
-  "_comment": "Example build spec using the synthetic reference/ files. Copy this file, point template/hymnal/library at your own real files, and edit items to match your week's song list.",
+  "_comment": "Example build spec using the synthetic reference/ files. Copy this file, point template/hymnal/library at your own real files, and edit items to match your week's song list. Run from this examples/ directory. Ops: clone_range, hymn, song, scripture, library_song (legacy alias of song-by-key).",
   "template": "../reference/example-template.pptx",
   "hymnal": "../reference/example-hymnal.pdf",
   "library": "../reference/song-library.example.json",
   "output": "example-output.pptx",
   "title_slide_index": 4,
   "lyric_slide_index": 5,
+  "format": { "capitalize_lines": true, "break_at": 30 },
   "items": [
     { "op": "clone_range", "start": 1, "end": 3 },
-    { "op": "hymn", "title": "Canto de Ejemplo Uno", "himno": 1, "verse_chunk_size": 2, "chorus_chunk_size": 2 },
-    { "op": "library_song", "key": "cancion-de-ejemplo" },
-    { "op": "hymn", "title": "Canto de Ejemplo Dos", "himno": 2, "verse_chunk_size": 2, "chorus_chunk_size": "whole" }
+    { "op": "hymn", "himno": 1, "verse_chunk_size": 2, "chorus_chunk_size": 2 },
+    { "op": "song", "key": "cancion-de-ejemplo" },
+    { "op": "song", "title_white": "Titulo de", "title_cream": "Cancion",
+      "sections": [
+        { "type": "verse", "lines": ["Primera linea de ejemplo,", "segunda linea de ejemplo."] },
+        { "type": "chorus", "lines": ["//Coro de ejemplo//", "segunda linea del coro."] }
+      ] },
+    { "op": "scripture", "book": "Libro", "range": "1:1-2",
+      "chunks": [ ["1", "Texto de ejemplo del versiculo uno.", "", "2", "Texto de ejemplo del versiculo dos."] ] },
+    { "op": "hymn", "himno": 2, "verse_chunk_size": 2, "chorus_chunk_size": "whole" }
   ]
 }

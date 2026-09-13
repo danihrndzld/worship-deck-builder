@@ -1,0 +1,21 @@
+{
+  "_comment": "Example of ONE song file in the growing song-library/ folder. Real songs live one-per-file here as <slug>.json and are gitignored (this _example.json is the only committed one). Add songs with: pptx_deck_builder.py song add --file entry.json, or backfill from an existing deck with: song import-deck --deck week.pptx. Text below is an original placeholder -- put your church's own licensed/typed lyrics here, never lyrics copied from a generic lyrics-aggregator website. Repeat markers like //..// and ///../// are shown on screen literally (a cue to sing the phrase 2x / 3x), so keep them in the text.",
+  "key": "cancion-de-ejemplo-folder",
+  "title": "Cancion De Ejemplo",
+  "title_white": "Cancion De",
+  "title_cream": "Ejemplo",
+  "artist": "Autor de Ejemplo",
+  "source": "cancionero",
+  "date_added": "2026-01-01",
+  "chunk_size": 2,
+  "sections": [
+    { "type": "verse", "lines": [
+      "Primera linea de la estrofa de ejemplo,",
+      "segunda linea de la estrofa de ejemplo."
+    ] },
+    { "type": "chorus", "lines": [
+      "//Primera linea del coro de ejemplo//",
+      "segunda linea del coro de ejemplo."
+    ] }
+  ]
+}
