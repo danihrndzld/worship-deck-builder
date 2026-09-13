@@ -38,8 +38,14 @@ install the Python dependencies, and confirm it's ready.
 - Chunks each verse/chorus into slide-sized pieces. There's no fixed number of
   lines per slide (it varies by stanza), so this is a tunable heuristic you
   check by rendering the result, not a black box.
-- Keeps a local, church-owned library for contemporary (non-hymnal) songs, and
-  never fetches lyrics from the open web to fill it in. More on why below.
+- Builds hymn, contemporary-song (two-tone title), and scripture (reference +
+  numbered verses) slides, applying the operator's own formatting conventions
+  (capitalize each line, split long lines at a comma, keep `//…//` repeat cues).
+- Keeps a **growing local library of unique contemporary songs** in
+  `reference/song-library/` (one file per song) that it consults first, so you
+  don't re-hunt each week. Add songs with `song add`, or backfill from decks you
+  already made with `song import-deck --deck old-week.pptx`. It never fetches
+  lyrics from the open web. More on why below.
 
 ## Why the `reference/` files are placeholders, not the real thing
 

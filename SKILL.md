@@ -27,9 +27,12 @@ church's own reference files, not a generic path you pass in each time.
   for a one-off.
 - `reference/hymnal.pdf` — the church's real himnario PDF. Default hymn source;
   only pass `"hymnal"` in the spec to override it.
-- `reference/song-library.json` — this church's own contemporary-song library, if
-  it exists yet (see `reference/song-library.example.json` for the shape). Not
-  required to start; add songs to it as they come up.
+- `reference/song-library/` — this church's growing library of **unique
+  contemporary songs**, one `<slug>.json` file per song (see
+  `reference/song-library/_example.json` for the shape). This is the source the
+  builder consults for non-hymn songs, so you don't have to dig through an old
+  deck or the web each week. Add songs with `song add` / `song import-deck` (below).
+  The legacy flat `reference/song-library.json` is still read if present.
 - `reference/example-template.pptx` / `reference/example-hymnal.pdf` — synthetic
   placeholders used only by `examples/songs.example.json` to demo/test the tool.
   Not used by a real build.
@@ -49,14 +52,14 @@ church's own reference files, not a generic path you pass in each time.
    per slide (see `reference/slide-types.md`) — set `verse_chunk_size` /
    `chorus_chunk_size` per song in the build spec (a `"whole"` chorus is common for
    short ones), then look at the rendered output and adjust.
-4. **Contemporary (non-hymnal) songs come from `reference/song-library.json`,
-   never from the open web.** Add entries yourself (typed in, or exported from a
-   licensed source like CCLI SongSelect) and reference them by key in the build
-   spec. A live web search is useful only to *identify* an unfamiliar song
-   (title/artist) — generic lyrics sites are unlicensed and often wrong (bad verse
-   order, missing repeats, typos); never source display text from them. Anything
-   not already in the library gets flagged for a human to type in, not fetched
-   automatically.
+4. **Contemporary (non-hymnal) songs come from the local `reference/song-library/`
+   folder, never from the open web.** Library-first: for each non-hymn song, look
+   it up in the library and reference it by `key`; if it's missing, flag it for a
+   human to add (typed in, or exported from a licensed source like CCLI SongSelect)
+   — then save it with `song add` / `song import-deck` so it's there next time. A
+   live web search is useful only to *identify* an unfamiliar song (title/artist);
+   generic lyrics sites are unlicensed and often wrong (bad verse order, missing
+   repeats, typos), so never source display text from them.
 5. **Build the deck.** `scripts/pptx_deck_builder.py build --spec songs.json`
    clones each needed slide's real shape XML (and re-links its embedded images)
    from `reference/style-template.pptx`, then swaps in the new text — this is what
@@ -75,41 +78,70 @@ church's own reference files, not a generic path you pass in each time.
 ```json
 {
   "output": "new-week.pptx",
+  "format": { "capitalize_lines": true, "break_at": 30 },
   "items": [
     { "op": "clone_range", "start": 1, "end": 3 },
-    { "op": "hymn", "title": "...", "himno": 64, "verse_chunk_size": 2, "chorus_chunk_size": 2 },
-    { "op": "library_song", "key": "song-key-in-library" },
+    { "op": "hymn", "himno": 64, "verse_chunk_size": 2, "chorus_chunk_size": 2 },
+    { "op": "song", "title_white": "Hoy te Rindo", "title_cream": "mi Ser", "key": "hoy-te-rindo-mi-ser" },
+    { "op": "scripture", "book": "San Mateo", "range": "5:14-16",
+      "chunks": [ ["14", "Vosotros sois la luz del mundo;", "", "15", "Ni se enciende una luz..."] ] },
     { "op": "clone_range", "start": 42, "end": 66 }
   ]
 }
 ```
 
-- `clone_range` reuses slides verbatim (1-indexed, inclusive) from `template`
-  (or another deck via an optional `"source"` field) — use it for anything that
-  didn't change (intro slides, purpose statement, a song already correct in a past
-  deck, the scripture reading).
-- `title_slide_index` / `lyric_slide_index` are optional — omit them to
-  auto-detect (a slide with 2 text boxes where the second matches `Himno \d+` is
-  the title template; the first 1-box, multi-line slide is the lyric template).
-  Pass them explicitly if auto-detection picks the wrong slide.
-- Full field reference: `scripts/pptx_deck_builder.py build --help`.
+Ops:
+- `clone_range` — reuse slides verbatim (1-indexed, inclusive) from `template`
+  (or another deck via `"source"`): intro slides, purpose statement, anything
+  already correct in a past deck.
+- `hymn` — pull `himno` N from the hymnal. `title` is optional; if omitted it's
+  taken from the hymnal page's ALL-CAPS header (verify accents — the header has
+  none, e.g. `Halle` for `Hallé`). **Never edit the hymnal's wording**; only the
+  chunk sizes are yours to tune.
+- `song` — a contemporary song. Either `"key"` (from `reference/song-library/`)
+  or inline `title_white`/`title_cream` + `sections`. Renders a two-tone title
+  (main phrase in white, secondary part in cream — keep the white part short so
+  the big font stays on one line) plus lyric slides.
+- `scripture` — a reference slide (`book` + `range`) then one slide per `chunks`
+  entry of numbered verse text (blank line between verses). Set verbatim.
+- `library_song` — legacy alias of `song` by key.
+
+`format` (optional, church defaults shown): `capitalize_lines` capitalizes the
+first letter of every lyric line; `break_at` splits any lyric line longer than N
+chars at a comma into shorter centered lines. Repeat markers `//…//` / `///…///`
+are shown literally (a cue to sing 2×/3×). Scripture text is never reformatted.
+
+`title_slide_index` / `lyric_slide_index` / `song_title_slide_index` /
+`scripture_ref_slide_index` / `scripture_text_slide_index` are optional overrides
+when template auto-detection picks the wrong slide. Full reference:
+`scripts/pptx_deck_builder.py build --help`.
+
+## Growing the song library
+
+```
+python3 scripts/pptx_deck_builder.py song list
+python3 scripts/pptx_deck_builder.py song add --file new-song.json
+python3 scripts/pptx_deck_builder.py song import-deck --deck ../old-deck.pptx
+```
+`song import-deck` mines an existing deck's contemporary-song title + lyric
+slides into the library (skipping hymns and scripture) — run it over your past
+decks once to backfill, and it captures each new week's new songs going forward.
 
 ## Common mistakes
 
 - Treating `verse_chunk_size`/`chorus_chunk_size` as exact — always render and
-  spot-check.
-- Sourcing contemporary lyrics from a generic lyrics website instead of
-  `reference/song-library.json`.
-- Rebuilding fonts/positions by hand instead of `clone_range`/cloning from
-  `reference/style-template.pptx`.
-- Passing an explicit `template`/`hymnal` path out of habit — leave them out
-  unless this build genuinely needs a different source than the church's own
-  reference files.
+  spot-check. Two long lines on one slide overflow; give a long line its own slide.
+- **Editing the hymnal's words** (e.g. "correcting" a spelling) — preserve the
+  himnario text; only fix OCR glue (numbers stuck to text).
+- Sourcing contemporary lyrics from a generic lyrics website instead of the
+  `reference/song-library/` folder.
+- Rebuilding fonts/positions by hand instead of cloning from the template.
 
 ## Script usage
 
 ```
 uv pip install -r requirements.txt
 python3 scripts/pptx_deck_builder.py build --spec songs.json
-python3 scripts/pptx_deck_builder.py hymn --page 64   # debug helper, reads reference/hymnal.pdf
+python3 scripts/pptx_deck_builder.py hymn --page 64   # debug helper
+python3 tests/test_builder.py                         # run the tests
 ```

@@ -9,6 +9,12 @@ song-library.json
 !reference/song-library.example.json
 !examples/songs.example.json
 
+# Growing per-song library folder holds real lyrics -> keep it out of git,
+# but commit the one example file that documents the entry shape. (Ignore the
+# folder CONTENTS, not the folder itself, so the negation can re-include it.)
+reference/song-library/*
+!reference/song-library/_example.json
+
 # Build output
 build/
 examples/example-output.pptx
