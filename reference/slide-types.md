@@ -11,7 +11,7 @@ demonstrates each one (slide numbers below match that file).
 | 4 | Hymn title | 2 boxes: song title, `Himno ##` | Second box is what `detect_template_slides()` matches on (`^himno\s+\d+$`). |
 | 5, 7 | Lyric slide | 1 box, 2+ lines | One verse/chorus chunk per slide. Auto-fit shrinks text to fit as line count grows. |
 | 6 | Contemporary song title | 2 boxes, both part of the title (no hymn number) | Used for songs not in the hymnal. |
-| 8 | Scripture section title | topic + reference range | Opens a scripture-reading segment. |
+| 8 | Sermon (prédica) title | lead-in phrase + BIG title + passage reference (a logo box may sit lower) | Opens the prédica. Built by the `sermon` op, which maps the boxes by layout (biggest font = title, box above = lead, box below = reference), so shape order doesn't matter. |
 | 9 | Scripture reference | book + verse range | One per reference if there's more than one. |
 | 10 | Scripture verse text | numbered verses | Same shape as a lyric slide; numbers stay inline with the text. |
 

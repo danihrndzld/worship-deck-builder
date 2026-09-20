@@ -38,9 +38,11 @@ install the Python dependencies, and confirm it's ready.
 - Chunks each verse/chorus into slide-sized pieces. There's no fixed number of
   lines per slide (it varies by stanza), so this is a tunable heuristic you
   check by rendering the result, not a black box.
-- Builds hymn, contemporary-song (two-tone title), and scripture (reference +
-  numbered verses) slides, applying the operator's own formatting conventions
-  (capitalize each line, split long lines at a comma, keep `//…//` repeat cues).
+- Builds hymn, contemporary-song (two-tone title), sermon-title (lead-in phrase +
+  big title + passage reference), and scripture (reference + numbered verses)
+  slides, applying the operator's own formatting conventions (capitalize each
+  line, split long lines at a comma, keep `//…//` repeat cues). Scripture text is
+  set verbatim — these decks use **Reina-Valera 1960**.
 - Keeps a **growing local library of unique contemporary songs** in
   `reference/song-library/` (one file per song) that it consults first, so you
   don't re-hunt each week. Add songs with `song add`, or backfill from decks you
@@ -110,7 +112,8 @@ uv pip install -r requirements.txt
 3. Write this week's `songs.json`, listing songs under `items` — `hymn` for
    anything in the hymnal (by hymn number), `library_song` for anything in your
    library (by key), `clone_range` for anything you're reusing unchanged from a
-   past deck (intro slides, the purpose statement, a scripture reading).
+   past deck (intro slides, the purpose statement, a scripture reading), and
+   `sermon` + `scripture` for the prédica (its title slide and its passage).
 4. Build it:
 
    ```bash

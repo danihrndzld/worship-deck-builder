@@ -106,6 +106,43 @@ def test_example_build_and_import_deck_roundtrip():
         assert not any("Himno" in t for t in titles)  # hymn/scripture skipped
 
 
+def test_sermon_boxes_map_by_layout_not_shape_order():
+    # The sermon template is found by layout (lead above the biggest-font
+    # title, reference below it), so a logo box further down is ignored and
+    # shape order doesn't matter.
+    prs = Presentation(str(REF / "example-template.pptx"))
+    slide = B.detect_sermon_title_slide(prs)
+    assert slide is not None, "sermon-title template not detected"
+    lead, title, ref = B.sermon_boxes(B.get_textboxes(slide))
+    assert B.first_font_size(title) > B.first_font_size(lead)
+    assert B.first_font_size(title) > B.first_font_size(ref)
+    assert (lead.top or 0) < (title.top or 0) < (ref.top or 0)
+    # The purpose slide has a similar stack but no digits in its bottom box,
+    # so it must not win the detection.
+    assert "0" in ref.text_frame.text
+
+
+def test_sermon_op_fills_lead_title_and_reference():
+    with tempfile.TemporaryDirectory() as d:
+        out = Path(d) / "out.pptx"
+        spec = Path(d) / "spec.json"
+        spec.write_text(f'''{{
+          "template": "{REF}/example-template.pptx",
+          "output": "{out}",
+          "items": [
+            {{"op":"sermon","lead":"Frase de","title":"Ejemplo",
+              "reference":"Libro 1"}}
+          ]
+        }}''')
+        B.build(str(spec))
+        assert zipfile.ZipFile(out).testzip() is None
+        slide = list(Presentation(str(out)).slides)[0]
+        lead, title, ref = B.sermon_boxes(B.get_textboxes(slide))
+        assert lead.text_frame.text.strip() == "Frase de"
+        assert title.text_frame.text.strip() == "Ejemplo"
+        assert ref.text_frame.text.strip() == "Libro 1"
+
+
 def _run():
     fns = [v for k, v in sorted(globals().items()) if k.startswith("test_")]
     for fn in fns:

@@ -40,6 +40,12 @@ church's own reference files, not a generic path you pass in each time.
 
 ## Workflow
 
+A full Sunday deck is **intro (logo + declaración de propósito) → the alabanzas
+→ the prédica**. The week's flyer usually lists only the alabanzas, so
+**always ask for the sermon title and its passage** before building — that part
+is easy to miss and the deck is incomplete without it. The prédica is a `sermon`
+title slide followed by a `scripture` passage (RV1960).
+
 1. **Identify each song.** If it's a hymn, get its hymn number. In this himnario,
    **PDF page number equals hymn number** — try
    `scripts/pptx_deck_builder.py hymn --page <N>` first (it reads
@@ -83,6 +89,7 @@ church's own reference files, not a generic path you pass in each time.
     { "op": "clone_range", "start": 1, "end": 3 },
     { "op": "hymn", "himno": 64, "verse_chunk_size": 2, "chorus_chunk_size": 2 },
     { "op": "song", "title_white": "Hoy te Rindo", "title_cream": "mi Ser", "key": "hoy-te-rindo-mi-ser" },
+    { "op": "sermon", "lead": "Frase de", "title": "Ejemplo", "reference": "Libro 1" },
     { "op": "scripture", "book": "San Mateo", "range": "5:14-16",
       "chunks": [ ["14", "Vosotros sois la luz del mundo;", "", "15", "Ni se enciende una luz..."] ] },
     { "op": "clone_range", "start": 42, "end": 66 }
@@ -102,9 +109,21 @@ Ops:
   or inline `title_white`/`title_cream` + `sections`. Renders a two-tone title
   (main phrase in white, secondary part in cream — keep the white part short so
   the big font stays on one line) plus lyric slides.
+- `sermon` — the prédica title slide: a small `lead` phrase, the big `title`
+  word under it, and the passage `reference` below (reads as one line, e.g.
+  "El tema de hoy" / **"Esperanza"** / "Salmos 1"). Pair it with a `scripture`
+  op for the passage itself. The template slide is found by layout — the
+  biggest-font box is the
+  title, the boxes directly above and below it are the lead and the reference —
+  so shape order doesn't matter and a logo box is ignored.
 - `scripture` — a reference slide (`book` + `range`) then one slide per `chunks`
   entry of numbered verse text (blank line between verses). Set verbatim.
 - `library_song` — legacy alias of `song` by key.
+
+**Bible version: always Reina-Valera 1960 (RV1960).** Every passage in these
+decks — the `scripture` op's `chunks` and any `reference` — uses RV1960 wording,
+punctuation and verse numbering. Don't mix translations, and don't paraphrase;
+set the text verbatim.
 
 `format` (optional, church defaults shown): `capitalize_lines` capitalizes the
 first letter of every lyric line; `break_at` splits any lyric line longer than N
@@ -112,6 +131,7 @@ chars at a comma into shorter centered lines. Repeat markers `//…//` / `///…
 are shown literally (a cue to sing 2×/3×). Scripture text is never reformatted.
 
 `title_slide_index` / `lyric_slide_index` / `song_title_slide_index` /
+`sermon_title_slide_index` /
 `scripture_ref_slide_index` / `scripture_text_slide_index` are optional overrides
 when template auto-detection picks the wrong slide. Full reference:
 `scripts/pptx_deck_builder.py build --help`.

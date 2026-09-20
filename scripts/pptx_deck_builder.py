@@ -112,6 +112,17 @@ def get_textboxes(slide):
     return [s for s in slide.shapes if s.has_text_frame and s.text_frame.text.strip()]
 
 
+def first_font_size(shape):
+    """The first explicit run font size in a text box, as an int (0 when the
+    box inherits its size). Used to tell a slide's big title box from the
+    smaller ones around it."""
+    for p in shape.text_frame.paragraphs:
+        for r in p.runs:
+            if r.font.size is not None:
+                return int(r.font.size)
+    return 0
+
+
 def set_textbox_lines(shape, lines):
     """Replace a text box's paragraph text line-by-line, reusing the box's run
     formatting (font/size/color/bold).
@@ -364,6 +375,38 @@ def build_two_tone_title(target, title_template, white_lines, cream_lines):
     return s
 
 
+def sermon_boxes(boxes):
+    """Map a sermon-title slide's boxes to (lead, title, reference).
+
+    Templates don't agree on shape order, so go by layout instead: stack the
+    boxes top to bottom, take the biggest-font one as the title, and the boxes
+    directly above and below it as the lead-in phrase and the scripture
+    reference. Anything further down (a logo) is left alone. Returns None if
+    the slide isn't shaped like that."""
+    ordered = sorted(boxes, key=lambda b: b.top or 0)
+    if len(ordered) < 3:
+        return None
+    sizes = [first_font_size(b) for b in ordered]
+    i = max(range(len(ordered)), key=lambda n: sizes[n])
+    if i == 0 or i == len(ordered) - 1:
+        return None
+    return ordered[i - 1], ordered[i], ordered[i + 1]
+
+
+def build_sermon_title(target, sermon_template, lead, title, reference):
+    """The prédica (sermon) title slide: a small lead-in phrase, the big main
+    word under it, and the passage reference below."""
+    s = clone_slide(sermon_template, target)
+    parts = sermon_boxes(get_textboxes(s))
+    if parts is None:
+        return s
+    lead_box, title_box, ref_box = parts
+    set_textbox_lines(lead_box, [lead] if lead else [""])
+    set_textbox_lines(title_box, [title])
+    set_textbox_lines(ref_box, [reference] if reference else [""])
+    return s
+
+
 def build_scripture(target, ref_template, text_template, book, rng, chunks):
     """A scripture segment: one reference slide (book + range) followed by one
     slide per chunk of numbered verse text."""
@@ -430,6 +473,32 @@ def detect_song_title_slide(prs, index=None):
     return None
 
 
+SERMON_REF_RE = re.compile(r"\d")
+
+
+def detect_sermon_title_slide(prs, index=None):
+    """The prédica (sermon) title template: 3+ text boxes stacked as lead-in
+    phrase / BIG title / passage reference (a logo box may sit lower down).
+
+    The reference box has to carry digits (a chapter or chapter:verse), which
+    is what separates this slide from the 'declaración de propósito' slide,
+    whose bottom box is plain prose. Pass sermon_title_slide_index when a
+    template needs it picked explicitly."""
+    slides = list(prs.slides)
+    if index:
+        return slides[index - 1]
+    for s in slides:
+        boxes = get_textboxes(s)
+        if len(boxes) < 3:
+            continue
+        parts = sermon_boxes(boxes)
+        if parts is None:
+            continue
+        if SERMON_REF_RE.search(parts[2].text_frame.text):
+            return s
+    return None
+
+
 def detect_scripture_slides(prs, ref_index=None, text_index=None):
     """Scripture reference template (2 boxes: book + range like '00:0-0') and
     scripture text template (1 box whose first paragraph is a bare number)."""
@@ -479,6 +548,7 @@ def build(spec_path):
     scr_ref_slide, scr_text_slide = detect_scripture_slides(
         template, spec.get("scripture_ref_slide_index"), spec.get("scripture_text_slide_index")
     )
+    sermon_slide = detect_sermon_title_slide(template, spec.get("sermon_title_slide_index"))
 
     target = Presentation(template_path)
     delete_all_slides(target)
@@ -534,6 +604,16 @@ def build(spec_path):
                     for s in item["sections"]
                 ]
             render_song(white, cream, sections)
+
+        elif op == "sermon":
+            if sermon_slide is None:
+                raise SystemExit(
+                    "sermon op needs a sermon-title template (a slide with a "
+                    "lead-in phrase, a big title and a passage reference). "
+                    "Pass sermon_title_slide_index in the spec."
+                )
+            build_sermon_title(target, sermon_slide, item.get("lead", ""),
+                               item["title"], item.get("reference", ""))
 
         elif op == "scripture":
             if scr_ref_slide is None or scr_text_slide is None:
