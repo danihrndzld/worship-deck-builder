@@ -22,7 +22,8 @@ stanza and looks tuned by a human for on-screen readability, not computed from a
 rule. `pptx_deck_builder.py` exposes `verse_chunk_size` / `chorus_chunk_size` per
 song (including a `"whole"` option to keep a short chorus on one slide) so you can
 match the original operator's judgment call — but always render and eyeball the
-result before Sunday.
+result before Sunday. Hymns default to `"auto"`: 4 lines per slide when every line
+is short (≤ 28 characters), otherwise 2.
 
 ## Reproducing this from your own deck
 

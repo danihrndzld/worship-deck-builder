@@ -123,6 +123,12 @@ uv pip install -r requirements.txt
 5. Open the output (or render it with `soffice --headless --convert-to pdf
    your-deck.pptx` and check the PDF) before Sunday. The line-chunking
    heuristic and any brand-new song entries are worth a human glance.
+   (LibreOffice ignores PowerPoint's shrink-to-fit, so its render can show
+   overflow that PowerPoint doesn't have.)
+6. Already edited the deck by hand and need to add readings? Don't rebuild it:
+   `python3 scripts/pptx_deck_builder.py insert --spec readings.json` adds
+   scripture slides before given slide numbers and leaves every other slide
+   untouched (see `SKILL.md`).
 
 Full spec format and CLI flags: `SKILL.md`, or `--help` on the script.
 

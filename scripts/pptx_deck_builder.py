@@ -40,7 +40,7 @@ DEFAULT_LIBRARY = SKILL_DIR / "reference" / "song-library.json"
 # may start lowercase (hymnals have the odd typo, e.g. "4 la fe..."), so we
 # don't constrain its first character.
 VERSE_RE = re.compile(r"^\s*(\d{1,2})(?!\d)[.\-]?\s*(\S.*\S|\S)\s*$")
-CHORUS_RE = re.compile(r"^\s*coro[.:-]*\s*(.*)$", re.IGNORECASE)
+CHORUS_RE = re.compile(r"^\s*coro[.,:-]*\s*(.*)$", re.IGNORECASE)  # some pages print "Coro,-"
 CREDIT_RE = re.compile(r"^\s*-\s*\S")  # trailing "-Tr. X." / "-Ejemplo." credit line
 PAGE_NUM_RE = re.compile(r"^\s*\d+\s*$")
 
@@ -220,19 +220,25 @@ def hymn_sections(parsed, verse_chunk_size, chorus_chunk_size):
     """Yield (kind, lines) stanza-by-stanza in performance order: verse 1,
     chorus, verse 2, chorus, ... -- matching how these hymnals are actually
     sung, and chunk each stanza into slide-sized pieces."""
+    def size(lines, requested):
+        return auto_chunk_size(lines) if requested == "auto" else requested
+
     sections = []
     for verse in parsed["verses"]:
-        sections.append(("verse", verse, verse_chunk_size))
+        sections.append(("verse", verse, size(verse, verse_chunk_size)))
         if parsed["chorus"]:
-            sections.append(("chorus", parsed["chorus"], chorus_chunk_size))
+            sections.append(("chorus", parsed["chorus"], size(parsed["chorus"], chorus_chunk_size)))
     return sections
 
 
 def hymn_title(raw_text):
-    """Best-effort hymn title from a hymnal page: the ALL-CAPS header line that
-    sits between the page number and verse 1. Returned in title case. The
-    header usually has no accents, so verify/override via the spec's "title".
-    Returns None if no header line is found (pass "title" explicitly)."""
+    """Best-effort hymn title from a hymnal page: the ALL-CAPS header between
+    the page number and verse 1. A long header wraps onto several lines
+    ("BIENAVENTURADOS LOS DE LIMPIO" / "CORAZON"), so consecutive caps lines
+    are joined. Returned in sentence case, the way the operator writes it
+    ("Bienaventurados los de limpio corazon"). Some headers lack accents, so
+    verify/override via the spec's "title". Returns None if no header is found."""
+    parts = []
     for line in raw_text.splitlines():
         s = line.strip()
         if not s or PAGE_NUM_RE.match(s):
@@ -241,8 +247,20 @@ def hymn_title(raw_text):
             break
         letters = [c for c in s if c.isalpha()]
         if len(letters) >= 3 and all(c.isupper() for c in letters):
-            return s.title()
-    return None
+            parts.append(s)
+        elif parts:
+            break  # first non-caps line after the header (tempo/key line)
+    if not parts:
+        return None
+    words = [PROPER_WORDS.get(w, w) for w in " ".join(parts).lower().split()]
+    return capitalize_first(" ".join(words))
+
+
+# Names kept capitalized when a caps header is turned into sentence case.
+PROPER_WORDS = {w.lower(): w for w in [
+    "Dios", "Cristo", "Jesús", "Jesus", "Jesucristo", "Señor", "Jehová", "Espíritu",
+    "Emmanuel", "Sion", "Sión",
+]}
 
 
 # --------------------------------------------------------------------------
@@ -284,6 +302,14 @@ def apply_format(lines, fmt):
         for p in pieces:
             out.append(capitalize_first(p) if fmt.get("capitalize_lines") else p)
     return out
+
+
+# A hymn whose lines are all short fits 4 lines per slide; longer lines need 2.
+AUTO_CHUNK_SHORT_LINE = 28
+
+
+def auto_chunk_size(lines):
+    return 4 if lines and max(len(l) for l in lines) <= AUTO_CHUNK_SHORT_LINE else 2
 
 
 # --------------------------------------------------------------------------
@@ -579,8 +605,8 @@ def build(spec_path):
             parsed = parse_hymn(raw)
             sections = hymn_sections(
                 parsed,
-                item.get("verse_chunk_size", 2),
-                item.get("chorus_chunk_size", 2),
+                item.get("verse_chunk_size", "auto"),
+                item.get("chorus_chunk_size", "auto"),
             )
             title = item.get("title") or hymn_title(raw) or f"Himno {page_no}"
             build_title_slide(target, title_slide, [title], [f"Himno {page_no}"])
@@ -636,6 +662,37 @@ def build(spec_path):
 # has a local source to consult instead of a Drive folder / the open web.
 # --------------------------------------------------------------------------
 
+def insert_into_deck(spec_path):
+    """Insert scripture slides into an EXISTING deck (e.g. one the operator
+    already edited by hand) without touching any of its slides. Each item is a
+    "scripture" op plus "before": the 1-indexed number of the deck's ORIGINAL
+    slide it goes in front of (omit it to append at the end). The scripture
+    reference/text slides are cloned from the deck itself."""
+    spec = json.loads(Path(spec_path).read_text(encoding="utf-8"))
+    prs = Presentation(spec["deck"])
+    original = list(prs.slides)
+    ref_t, text_t = detect_scripture_slides(
+        prs, spec.get("scripture_ref_slide_index"), spec.get("scripture_text_slide_index")
+    )
+    if ref_t is None or text_t is None:
+        raise SystemExit("No scripture slides found in the deck. Pass "
+                         "scripture_ref_slide_index / scripture_text_slide_index in the spec.")
+    id_list = prs.slides._sldIdLst
+    for item in spec["items"]:
+        if item.get("op", "scripture") != "scripture":
+            raise SystemExit(f"insert only supports scripture items, got {item.get('op')!r}")
+        n_before = len(id_list)
+        build_scripture(prs, ref_t, text_t, item["book"], item["range"], item["chunks"])
+        if item.get("before"):
+            anchor_id = original[item["before"] - 1].slide_id
+            anchor = next(e for e in id_list if int(e.get("id")) == anchor_id)
+            for e in list(id_list)[n_before:]:
+                anchor.addprevious(e)
+    prs.save(spec.get("output", spec["deck"]))
+    print(f"wrote {spec.get('output', spec['deck'])} ({len(prs.slides)} slides, "
+          f"{len(prs.slides) - len(original)} inserted)")
+
+
 def library_dir(folder=None):
     d = Path(folder) if folder else DEFAULT_LIBRARY_DIR
     d.mkdir(parents=True, exist_ok=True)
@@ -672,8 +729,9 @@ def songs_from_deck(deck_path):
     for s in prs.slides:
         boxes = get_textboxes(s)
         if len(boxes) == 2:
-            second = boxes[1].text_frame.text.strip()
-            if HIMNO_RE.match(second) or RANGE_RE.match(second):
+            first, second = (b.text_frame.text.strip() for b in boxes)
+            # the hymn number sits in either box ("Titulo / Himno 116" or "HIMNO 138 / titulo")
+            if HIMNO_RE.match(first) or HIMNO_RE.match(second) or RANGE_RE.match(second):
                 current = None  # hymn or scripture -> not a library song
                 continue
             current = {"title_white": boxes[0].text_frame.text.strip(),
@@ -697,6 +755,9 @@ def main():
     b = sub.add_parser("build", help="Build a deck from a JSON spec file")
     b.add_argument("--spec", required=True, help="Path to songs.json (see examples/songs.example.json)")
 
+    ins = sub.add_parser("insert", help="Insert scripture slides into an existing (hand-edited) deck")
+    ins.add_argument("--spec", required=True, help='JSON: {"deck", "output", "items": [{"op": "scripture", "before": N, ...}]}')
+
     h = sub.add_parser("hymn", help="Look up and print one hymn's parsed text (debug helper)")
     h.add_argument("--hymnal", default=None, help=f"Defaults to {DEFAULT_HYMNAL}")
     h.add_argument("--page", type=int, required=True, help="Page number (often == hymn number)")
@@ -715,6 +776,8 @@ def main():
 
     if args.command == "build":
         build(args.spec)
+    elif args.command == "insert":
+        insert_into_deck(args.spec)
     elif args.command == "hymn":
         hymnal_path = resolve_default(args.hymnal, DEFAULT_HYMNAL, "hymnal")
         raw = hymn_page_text(hymnal_path, args.page)
@@ -730,8 +793,9 @@ def main():
         elif args.song_cmd == "import-deck":
             added = 0
             for entry in songs_from_deck(args.deck):
-                if save_song(entry, overwrite=args.overwrite):
-                    print(f"+ {entry['key']}  ({len(entry['sections'])} slides)")
+                dest = save_song(entry, overwrite=args.overwrite)
+                if dest:
+                    print(f"+ {dest.stem}  ({len(entry['sections'])} slides)")
                     added += 1
             print(f"imported {added} new song(s) into {DEFAULT_LIBRARY_DIR}")
 

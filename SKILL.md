@@ -46,6 +46,20 @@ A full Sunday deck is **intro (logo + declaración de propósito) → the alaban
 is easy to miss and the deck is incomplete without it. The prédica is a `sermon`
 title slide followed by a `scripture` passage (RV1960).
 
+If there is a **dirección** for the same Sunday (see `Iglesia/Direcciones/`), its
+readings go in the deck too, each one as a `scripture` op right where it is read in
+the service:
+
+| Reading in the dirección | Goes in the deck |
+|---|---|
+| Lectura de bienvenida | right before the 1st worship set |
+| Lectura del tema | right before the 2nd worship set |
+| Segundo tiempo bíblico | right before the 3rd worship set |
+| Ofrenda + bendición | at the end, after the sermon passage |
+
+A deck the operator already edited by hand is never rebuilt: add the readings with
+the `insert` command (below), which leaves every existing slide byte-identical.
+
 1. **Identify each song.** If it's a hymn, get its hymn number. In this himnario,
    **PDF page number equals hymn number** — try
    `scripts/pptx_deck_builder.py hymn --page <N>` first (it reads
@@ -54,10 +68,13 @@ title slide followed by a `scripture` passage (RV1960).
 2. **Parse the hymn page** into verses (numbered `1/2/3/4…`) and a chorus (`Coro.-`
    marker) — `parse_hymn()` in `scripts/pptx_deck_builder.py` does this. Treat the
    result as a draft, not gospel: some hymns won't fit this exact format.
-3. **Chunk each stanza into slide-sized pieces.** There's no fixed formula for lines
-   per slide (see `reference/slide-types.md`) — set `verse_chunk_size` /
-   `chorus_chunk_size` per song in the build spec (a `"whole"` chorus is common for
-   short ones), then look at the rendered output and adjust.
+3. **Chunk each stanza into slide-sized pieces.** Hymns default to `"auto"`: 4
+   lines per slide when every line is short (≤ 28 chars, e.g. Himno 132), 2 when
+   they're long (e.g. Himno 116). Override with `verse_chunk_size` /
+   `chorus_chunk_size` per song (a `"whole"` chorus is common for short ones), then
+   look at the rendered output and adjust. For contemporary songs aim for 3–4 short
+   lines per slide; split an over-long line at a natural phrase break
+   ("QUEREMOS DARTE / LO MEJOR DE NUESTRAS VIDAS") instead of giving it its own slide.
 4. **Contemporary (non-hymnal) songs come from the local `reference/song-library/`
    folder, never from the open web.** Library-first: for each non-hymn song, look
    it up in the library and reference it by `key`; if it's missing, flag it for a
@@ -73,6 +90,13 @@ title slide followed by a `scripture` passage (RV1960).
 6. **Verify before Sunday.** Reopen the output with `python-pptx`, zip-integrity
    check it, and render to PDF/PNG (`soffice --headless --convert-to pdf`) to
    eyeball it. The chunking heuristic and any new song entries need a human look.
+   **LibreOffice ignores PowerPoint's shrink-to-fit**, so a 4-line slide can look
+   overflowing in the render and still fit in PowerPoint: only re-chunk when a line
+   is really long, not just because the soffice preview spills.
+7. **Learn from the operator's edits.** After the operator fixes the deck by hand,
+   diff it against what you built and fold the fixes back in: re-save changed
+   songs into the library (their final grouping, `chunk_size` 99 = one section per
+   slide) and note any new convention here.
 
 ## Build spec (songs.json)
 
@@ -87,7 +111,7 @@ title slide followed by a `scripture` passage (RV1960).
   "format": { "capitalize_lines": true, "break_at": 30 },
   "items": [
     { "op": "clone_range", "start": 1, "end": 3 },
-    { "op": "hymn", "himno": 64, "verse_chunk_size": 2, "chorus_chunk_size": 2 },
+    { "op": "hymn", "himno": 64 },
     { "op": "song", "title_white": "Hoy te Rindo", "title_cream": "mi Ser", "key": "hoy-te-rindo-mi-ser" },
     { "op": "sermon", "lead": "Frase de", "title": "Ejemplo", "reference": "Libro 1" },
     { "op": "scripture", "book": "San Mateo", "range": "5:14-16",
@@ -102,13 +126,17 @@ Ops:
   (or another deck via `"source"`): intro slides, purpose statement, anything
   already correct in a past deck.
 - `hymn` — pull `himno` N from the hymnal. `title` is optional; if omitted it's
-  taken from the hymnal page's ALL-CAPS header (verify accents — the header has
-  none, e.g. `Halle` for `Hallé`). **Never edit the hymnal's wording**; only the
-  chunk sizes are yours to tune.
+  the hymnal page's **full** ALL-CAPS header (joined when it wraps onto two
+  lines) in sentence case, keeping divine names capitalized ("Bienaventurados los
+  de limpio corazón", "Con Cristo yo iré"). Don't shorten it. Verify accents:
+  some headers have none, e.g. `Halle` for `Hallé`. **Never edit the hymnal's
+  wording**; only the chunk sizes are yours to tune.
 - `song` — a contemporary song. Either `"key"` (from `reference/song-library/`)
   or inline `title_white`/`title_cream` + `sections`. Renders a two-tone title
   (main phrase in white, secondary part in cream — keep the white part short so
-  the big font stays on one line) plus lyric slides.
+  the big font stays on one line) plus lyric slides. Titles go in sentence case
+  ("Yo quiero más" / "de Ti"). A line sung twice is written once as `//…//`, not
+  duplicated, and don't add outro slides that aren't in the arrangement.
 - `sermon` — the prédica title slide: a small `lead` phrase, the big `title`
   word under it, and the passage `reference` below (reads as one line, e.g.
   "El tema de hoy" / **"Esperanza"** / "Salmos 1"). Pair it with a `scripture`
@@ -136,6 +164,29 @@ are shown literally (a cue to sing 2×/3×). Scripture text is never reformatted
 when template auto-detection picks the wrong slide. Full reference:
 `scripts/pptx_deck_builder.py build --help`.
 
+## Adding slides to a hand-edited deck (`insert`)
+
+```
+python3 scripts/pptx_deck_builder.py insert --spec readings.json
+```
+```json
+{
+  "deck": "SEPTIEMBRE 27.pptx",
+  "output": "SEPTIEMBRE 27.pptx",
+  "items": [
+    { "op": "scripture", "before": 4, "book": "San Mateo", "range": "5:8",
+      "chunks": [["8", "Bienaventurados los de limpio corazón,", "porque ellos verán a Dios."]] },
+    { "op": "scripture", "book": "Romanos", "range": "12:1", "chunks": [["1", "..."]] }
+  ]
+}
+```
+`before` is the number of the deck's **original** slide the reading goes in front
+of (numbers don't shift as you insert); omit it to append at the end. The
+reference/text slides are cloned from the deck's own scripture slides (auto-detected,
+or `scripture_ref_slide_index` / `scripture_text_slide_index`). Every existing
+slide is left byte-identical. Back up the deck first, and give a reading with
+long verses one slide per verse.
+
 ## Growing the song library
 
 ```
@@ -150,7 +201,11 @@ decks once to backfill, and it captures each new week's new songs going forward.
 ## Common mistakes
 
 - Treating `verse_chunk_size`/`chorus_chunk_size` as exact — always render and
-  spot-check. Two long lines on one slide overflow; give a long line its own slide.
+  spot-check. Two long lines on one slide overflow; split a long line at a phrase
+  break rather than shrinking every slide to 2 lines.
+- Shortening a hymn title ("Bienaventurados" instead of "Bienaventurados los de
+  limpio corazón").
+- Rebuilding a deck the operator already edited — use `insert` instead.
 - **Editing the hymnal's words** (e.g. "correcting" a spelling) — preserve the
   himnario text; only fix OCR glue (numbers stuck to text).
 - Sourcing contemporary lyrics from a generic lyrics website instead of the
@@ -162,6 +217,7 @@ decks once to backfill, and it captures each new week's new songs going forward.
 ```
 uv pip install -r requirements.txt
 python3 scripts/pptx_deck_builder.py build --spec songs.json
+python3 scripts/pptx_deck_builder.py insert --spec readings.json   # add to an edited deck
 python3 scripts/pptx_deck_builder.py hymn --page 64   # debug helper
 python3 tests/test_builder.py                         # run the tests
 ```
