@@ -35,9 +35,27 @@ def test_parse_hymn_handles_dot_glued_and_lowercase():
     assert p["chorus"][0] == "Linea del coro,"
 
 
+def test_parse_hymn_accepts_coro_comma_typo():
+    raw = "132\nTITULO\n1 Linea uno,\nlinea dos.\nCoro,- :::Linea del coro:::\nOtra del coro."
+    assert B.parse_hymn(raw)["chorus"] == [":::Linea del coro:::", "Otra del coro."]
+
+
 def test_hymn_title_from_caps_header():
     raw = "48\nHALLE UN BUEN AMIGO\nKey F.\n1 Halle un buen amigo,"
-    assert B.hymn_title(raw) == "Halle Un Buen Amigo"
+    assert B.hymn_title(raw) == "Halle un buen amigo"
+
+
+def test_hymn_title_joins_wrapped_header_and_keeps_divine_names():
+    raw = "7\nCANTAD A CRISTO LOS DE LIMPIO\nCORAZON\nKey G.\n444\n1 Primera linea,"
+    assert B.hymn_title(raw) == "Cantad a Cristo los de limpio corazon"
+
+
+def test_auto_chunk_size_by_line_length():
+    assert B.auto_chunk_size(["Linea corta,", "otra corta"]) == 4
+    assert B.auto_chunk_size(["Una linea bastante larga para una sola vez,", "x"]) == 2
+    parsed = {"verses": [["a,", "b,", "c,", "d,", "e,", "f,", "g,", "h."]], "chorus": ["coro,", "fin."]}
+    assert [s[2] for s in B.hymn_sections(parsed, "auto", "auto")] == [4, 4]
+    assert [s[2] for s in B.hymn_sections(parsed, 2, "whole")] == [2, "whole"]
 
 
 def test_capitalize_and_break_long_line():
@@ -141,6 +159,54 @@ def test_sermon_op_fills_lead_title_and_reference():
         assert lead.text_frame.text.strip() == "Frase de"
         assert title.text_frame.text.strip() == "Ejemplo"
         assert ref.text_frame.text.strip() == "Libro 1"
+
+
+def test_import_deck_skips_hymn_titles_in_either_box():
+    with tempfile.TemporaryDirectory() as d:
+        out = Path(d) / "out.pptx"
+        spec = Path(d) / "spec.json"
+        spec.write_text(f'''{{
+          "template": "{REF}/example-template.pptx",
+          "output": "{out}",
+          "items": [
+            {{"op":"song","title_white":"HIMNO 138","title_cream":"firmes y adelante",
+              "sections":[{{"type":"verse","lines":["Linea uno."]}}]}}
+          ]
+        }}''')
+        B.build(str(spec))
+        assert B.songs_from_deck(str(out)) == []
+
+
+def test_insert_adds_scripture_without_touching_existing_slides():
+    from lxml import etree
+    with tempfile.TemporaryDirectory() as d:
+        deck = Path(d) / "deck.pptx"
+        out = Path(d) / "out.pptx"
+        spec = Path(d) / "spec.json"
+        spec.write_text(f'''{{
+          "template": "{REF}/example-template.pptx",
+          "output": "{deck}",
+          "items": [{{"op":"clone_range","start":1,"end":10}}]
+        }}''')
+        B.build(str(spec))
+        spec.write_text(f'''{{
+          "deck": "{deck}", "output": "{out}",
+          "items": [
+            {{"op":"scripture","before":4,"book":"Nuevo","range":"2:3",
+              "chunks":[["3","Texto nuevo."]]}},
+            {{"op":"scripture","book":"Final","range":"4:5","chunks":[["5","Al final."]]}}
+          ]
+        }}''')
+        B.insert_into_deck(str(spec))
+        before = list(Presentation(str(deck)).slides)
+        after = list(Presentation(str(out)).slides)
+        assert len(after) == len(before) + 4
+        texts = [" ".join(b.text_frame.text for b in B.get_textboxes(s)) for s in after]
+        assert "Nuevo" in texts[3] and "Texto nuevo." in texts[4]
+        assert "Final" in texts[-2] and "Al final." in texts[-1]
+        by_id = {s.slide_id: s for s in after}
+        for s in before:  # every original slide is byte-identical
+            assert etree.tostring(s._element) == etree.tostring(by_id[s.slide_id]._element)
 
 
 def _run():
