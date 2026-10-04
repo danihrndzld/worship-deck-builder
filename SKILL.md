@@ -1,6 +1,6 @@
 ---
 name: ppt
-description: Use when building or rebuilding this church's Sunday-service slide deck (PowerPoint) from a song list, when extracting hymn lyrics out of the church's himnario PDF by hymn number, or when a new week's PPTX needs the same background/fonts/logo as a previous week's deck.
+description: Use when building or rebuilding this church's Sunday-service slide deck (PowerPoint) from a song list, when extracting hymn lyrics out of the church's himnario PDF by hymn number, or when a new week's PPTX needs the same background/fonts/logo as a previous week's deck, or when making the singers' lyrics PDF (letras) from a deck the operator already reviewed.
 ---
 
 # ppt (worship deck builder)
@@ -97,6 +97,20 @@ the `insert` command (below), which leaves every existing slide byte-identical.
    diff it against what you built and fold the fixes back in: re-save changed
    songs into the library (their final grouping, `chunk_size` 99 = one section per
    slide) and note any new convention here.
+8. **Lyrics PDF for the singers — only after the operator reviewed the deck.**
+   It is never part of `build`: the operator often fixes structure by hand
+   (repeats, order, line breaks), and the sheet must match what is on screen.
+   Ask her "¿ya revisaste la presentación?" and run it only on a clear yes, on
+   the deck file she reviewed (the one in OneDrive, not your build output):
+   ```
+   python3 scripts/lyrics_pdf.py --deck "…/Presentaciones 2026/OCTUBRE 3.pptx" --reviewed
+   ```
+   Never pass `--reviewed` on your own; without it the script refuses. Output
+   is `Letras - <deck name>.pdf` next to the deck. The format is approved:
+   one song per page, in the deck's order and with its repeats; hymns as whole
+   stanzas with "Himno N" above the title; a song that won't fit one column at
+   12 pt goes in two columns on its page; the font never shrinks so far that a
+   line wraps. Render the pages and look at them before handing it over.
 
 ## Build spec (songs.json)
 
@@ -211,6 +225,8 @@ decks once to backfill, and it captures each new week's new songs going forward.
 - Sourcing contemporary lyrics from a generic lyrics website instead of the
   `reference/song-library/` folder.
 - Rebuilding fonts/positions by hand instead of cloning from the template.
+- Making the lyrics PDF from the build output or the spec, or before the
+  operator reviewed the deck (see step 8).
 
 ## Script usage
 
@@ -219,5 +235,7 @@ uv pip install -r requirements.txt
 python3 scripts/pptx_deck_builder.py build --spec songs.json
 python3 scripts/pptx_deck_builder.py insert --spec readings.json   # add to an edited deck
 python3 scripts/pptx_deck_builder.py hymn --page 64   # debug helper
+python3 scripts/lyrics_pdf.py --deck reviewed.pptx --reviewed   # singers' PDF (step 8)
 python3 tests/test_builder.py                         # run the tests
+python3 tests/test_lyrics_pdf.py
 ```
