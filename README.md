@@ -48,6 +48,10 @@ install the Python dependencies, and confirm it's ready.
   don't re-hunt each week. Add songs with `song add`, or backfill from decks you
   already made with `song import-deck --deck old-week.pptx`. It never fetches
   lyrics from the open web. More on why below.
+- Makes a lyrics PDF for the singers (`scripts/lyrics_pdf.py`) from the deck
+  *after* the operator has reviewed it, so it matches what is on screen: one
+  song per page, in the deck's order with its repeats, two columns only when a
+  song is too long for one. It refuses to run without `--reviewed`.
 
 ## Why the `reference/` files are placeholders, not the real thing
 
