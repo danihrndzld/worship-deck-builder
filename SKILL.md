@@ -90,13 +90,17 @@ the `insert` command (below), which leaves every existing slide byte-identical.
 6. **Verify before Sunday.** Reopen the output with `python-pptx`, zip-integrity
    check it, and render to PDF/PNG (`soffice --headless --convert-to pdf`) to
    eyeball it. The chunking heuristic and any new song entries need a human look.
-   **LibreOffice ignores PowerPoint's shrink-to-fit**, so a 4-line slide can look
-   overflowing in the render and still fit in PowerPoint: only re-chunk when a line
-   is really long, not just because the soffice preview spills.
+   The template's text boxes use `spAutoFit` (the *box* grows to fit the text;
+   the font never shrinks), and PowerPoint only re-applies it when the text is
+   edited, not on open. So overflow in the soffice render is usually real. The
+   builder now widens every lyric box to the slide's frame and centers it
+   vertically for its line count, the way the operator used to fix each slide
+   by hand; if a slide still spills, split a line or re-chunk.
 7. **Learn from the operator's edits.** After the operator fixes the deck by hand,
    diff it against what you built and fold the fixes back in: re-save changed
    songs into the library (their final grouping, `chunk_size` 99 = one section per
-   slide) and note any new convention here.
+   slide, `"verbatim": true` so her line breaks and casing are not reformatted)
+   and note any new convention here.
 8. **Lyrics PDF for the singers — only after the operator reviewed the deck.**
    It is never part of `build`: the operator often fixes structure by hand
    (repeats, order, line breaks), and the sheet must match what is on screen.
@@ -122,7 +126,7 @@ the `insert` command (below), which leaves every existing slide byte-identical.
 ```json
 {
   "output": "new-week.pptx",
-  "format": { "capitalize_lines": true, "break_at": 30 },
+  "format": { "capitalize_lines": true, "break_at": 28 },
   "items": [
     { "op": "clone_range", "start": 1, "end": 3 },
     { "op": "hymn", "himno": 64 },
@@ -144,13 +148,22 @@ Ops:
   lines) in sentence case, keeping divine names capitalized ("Bienaventurados los
   de limpio corazón", "Con Cristo yo iré"). Don't shorten it. Verify accents:
   some headers have none, e.g. `Halle` for `Hallé`. **Never edit the hymnal's
-  wording**; only the chunk sizes are yours to tune.
+  wording**; only the chunk sizes are yours to tune. Leave the chunk sizes on
+  `"auto"` unless the operator asks otherwise (she reverted a forced 4-line
+  Himno 168 back to auto's 2 lines). Hymn lines are never re-broken: the
+  widened box wraps them.
 - `song` — a contemporary song. Either `"key"` (from `reference/song-library/`)
   or inline `title_white`/`title_cream` + `sections`. Renders a two-tone title
   (main phrase in white, secondary part in cream — keep the white part short so
   the big font stays on one line) plus lyric slides. Titles go in sentence case
-  ("Yo quiero más" / "de Ti"). A line sung twice is written once as `//…//`, not
-  duplicated, and don't add outro slides that aren't in the arrangement.
+  ("Yo quiero más" / "de Ti"). A one-word title ("Fidelidad") goes in
+  `title_white` alone and is set at the big size. A line sung twice is written
+  once as `//…//`, not duplicated ("Oh, tu fidelidad, oh, tu fidelidad" ->
+  "//Oh, tu fidelidad//", done automatically). Don't add outro slides or extra
+  repeats that aren't in the arrangement: old decks often over-repeat, so take
+  one pass of each section plus the real ending. A library entry with
+  `"verbatim": true` (and an inline song with `"verbatim": true`) is set exactly
+  as stored.
 - `sermon` — the prédica title slide: a small `lead` phrase, the big `title`
   word under it, and the passage `reference` below (reads as one line, e.g.
   "El tema de hoy" / **"Esperanza"** / "Salmos 1"). Pair it with a `scripture`
@@ -169,7 +182,11 @@ set the text verbatim.
 
 `format` (optional, church defaults shown): `capitalize_lines` capitalizes the
 first letter of every lyric line; `break_at` splits any lyric line longer than N
-chars at a comma into shorter centered lines. Repeat markers `//…//` / `///…///`
+chars at a phrase break near the middle — after a comma, or before a connector
+word (y, que, pues, de, en, a, por, para…) — never leaving a piece under 8
+chars. Continuation pieces stay lowercase ("Mi alma te anhela / y tiene sed").
+`collapse_repeats` writes a doubled phrase once as `//…//`. Hymns skip both
+`break_at` and `collapse_repeats`. Repeat markers `//…//` / `///…///`
 are shown literally (a cue to sing 2×/3×). Scripture text is never reformatted.
 
 `title_slide_index` / `lyric_slide_index` / `song_title_slide_index` /
@@ -227,6 +244,11 @@ decks once to backfill, and it captures each new week's new songs going forward.
 - Rebuilding fonts/positions by hand instead of cloning from the template.
 - Making the lyrics PDF from the build output or the spec, or before the
   operator reviewed the deck (see step 8).
+- Cloning the template's last slide as a closing slide — it renders blank and
+  the operator deletes it. End the deck with the sermon passage (or the
+  ofrenda/bendición readings when there is a dirección).
+- Assuming the soffice render "overflows but PowerPoint will shrink it" — it
+  won't (see step 6).
 
 ## Script usage
 

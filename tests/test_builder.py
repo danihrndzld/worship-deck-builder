@@ -63,6 +63,28 @@ def test_capitalize_and_break_long_line():
     assert B.break_long_line("Renuevame, Senor Jesus, pon en mi corazon", 20) == \
         ["Renuevame,", "Senor Jesus,", "pon en mi corazon"]
     assert B.break_long_line("linea corta", 30) == ["linea corta"]
+    # No comma: split before a connector word near the middle.
+    assert B.break_long_line("Nada me falta pues todo provees", 28) == \
+        ["Nada me falta", "pues todo provees"]
+    # Never leave a stub piece ("Oh," / "a ti").
+    assert B.break_long_line("Oh, tu diestra me ha sostenido", 28) == \
+        ["Oh, tu diestra me ha sostenido"]
+    assert B.break_long_line("De madrugada yo me acercare a ti", 28) == \
+        ["De madrugada yo me acercare a ti"]
+
+
+def test_apply_format_lowercase_continuation_and_doubled_line():
+    assert B.apply_format(["mi alma te anhela y tiene sed"], None) == \
+        ["Mi alma te anhela", "y tiene sed"]
+    assert B.apply_format(["Oh, tu fidelidad, oh, tu fidelidad"], None) == \
+        ["//Oh, tu fidelidad//"]
+
+
+def test_estimate_lines_wraps_by_width():
+    size = 1257554  # 99pt in EMU
+    wide = 16666150
+    assert B.estimate_lines(["Hermoso eres, mi Senor"], wide, size) == 1
+    assert B.estimate_lines(["Levantemos nuestras manos y adoremos"], wide, size) == 2
 
 
 def test_set_textbox_lines_never_drops_a_line():
@@ -122,6 +144,15 @@ def test_example_build_and_import_deck_roundtrip():
         titles = [s["title"] for s in songs]
         assert "Titulo Cancion" in titles  # the contemporary song was extracted
         assert not any("Himno" in t for t in titles)  # hymn/scripture skipped
+        # Lyric boxes are widened to the frame and centered vertically.
+        prs = Presentation(str(out))
+        for slide in prs.slides:
+            boxes = B.get_textboxes(slide)
+            if len(boxes) == 1 and boxes[0].text_frame.text.startswith("Linea uno"):
+                box = boxes[0]
+                left, _t, width, _h = B.frame_bounds(slide, box)
+                assert (box.left, box.width) == (left, width)
+                assert abs((box.top + box.height / 2) - prs.slide_height / 2) < 2
 
 
 def test_sermon_boxes_map_by_layout_not_shape_order():
