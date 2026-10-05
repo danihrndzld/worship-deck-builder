@@ -24,6 +24,7 @@ import unicodedata
 from pathlib import Path
 
 from pptx import Presentation
+from pptx.enum.shapes import MSO_SHAPE_TYPE
 from pptx.oxml.ns import qn
 from pypdf import PdfReader
 
@@ -267,7 +268,7 @@ PROPER_WORDS = {w.lower(): w for w in [
 # Lyric text conventions (how the church's operator formats slides by hand)
 # --------------------------------------------------------------------------
 
-DEFAULT_FORMAT = {"capitalize_lines": True, "break_at": 30}
+DEFAULT_FORMAT = {"capitalize_lines": True, "break_at": 28, "collapse_repeats": True}
 
 
 def capitalize_first(line):
@@ -277,30 +278,63 @@ def capitalize_first(line):
     return line
 
 
+# Words a long line is split *before* when it has no comma near the middle
+# ("Mi alma te anhela / y tiene sed", "Nada me falta / pues todo provees").
+BREAK_BEFORE = {"y", "e", "o", "que", "pues", "de", "en", "a", "por", "para", "con", "sin"}
+MIN_PIECE = 8  # never leave a stub like "Oh," or "a ti" on its own line
+
+
 def break_long_line(line, max_len):
-    """Split an over-long line at a comma near the middle into shorter visual
-    lines, the way the operator does by hand ("Renuevame, Senor Jesus" ->
-    "Renuevame, / Senor Jesus"). Repeat markers (//..//) are left untouched."""
+    """Split an over-long line at a natural phrase break near the middle, the
+    way the operator does by hand: after a comma ("Renuevame, / Senor Jesus")
+    or before a connector word ("Mi alma te anhela / y tiene sed"). Both
+    pieces must be at least MIN_PIECE long. Repeat markers (//..//) are left
+    untouched."""
     if not max_len or len(line) <= max_len:
         return [line]
-    commas = [i for i, ch in enumerate(line) if ch == ","]
-    if not commas:
-        return [line]
     mid = len(line) / 2
-    cut = min(commas, key=lambda i: abs(i - mid))
-    head, tail = line[:cut + 1].strip(), line[cut + 1:].strip()
-    if not head or not tail:
-        return [line]
-    return break_long_line(head, max_len) + break_long_line(tail, max_len)
+    cuts = []  # (score, index the tail starts at)
+    for i, ch in enumerate(line):
+        if ch == ",":
+            cuts.append((abs(i + 1 - mid) - 4, i + 1))  # commas win a near-tie
+    for m in re.finditer(r"\s(\S+)", line):
+        if m.group(1).lower() in BREAK_BEFORE:
+            cuts.append((abs(m.start() - mid), m.start()))
+    for _score, cut in sorted(cuts):
+        head, tail = line[:cut].strip(), line[cut:].strip()
+        if len(head) >= MIN_PIECE and len(tail) >= MIN_PIECE:
+            return break_long_line(head, max_len) + break_long_line(tail, max_len)
+    return [line]
+
+
+def collapse_doubled_line(line):
+    """'Oh, tu fidelidad, oh, tu fidelidad' -> '//Oh, tu fidelidad//': a line
+    that is the same phrase twice is written once with the repeat marker."""
+    if "/" in line:
+        return line
+    body = line.rstrip(",.")
+    for i, ch in enumerate(body):
+        if ch == ",":
+            head, tail = body[:i].strip(), body[i + 1:].strip()
+            if head and head.lower() == tail.lower():
+                return f"//{head}//"
+    return line
 
 
 def apply_format(lines, fmt):
+    """Operator conventions for lyric lines. Only the first piece of a split
+    line is capitalized; the continuation stays lowercase, as she types it
+    ("Hermoso eres Tú, / amado mío"). fmt "verbatim" leaves lines untouched."""
+    if fmt == "verbatim":
+        return list(lines)
     fmt = {**DEFAULT_FORMAT, **(fmt or {})}
     out = []
     for line in lines:
+        if fmt.get("collapse_repeats"):
+            line = collapse_doubled_line(line)
         pieces = break_long_line(line, fmt.get("break_at")) if fmt.get("break_at") else [line]
-        for p in pieces:
-            out.append(capitalize_first(p) if fmt.get("capitalize_lines") else p)
+        for n, p in enumerate(pieces):
+            out.append(capitalize_first(p) if fmt.get("capitalize_lines") and n == 0 else p)
     return out
 
 
@@ -367,6 +401,51 @@ def entry_title_lines(entry):
 # Slide building
 # --------------------------------------------------------------------------
 
+# The template's lyric box is narrower than the slide's frame and has a fixed
+# height. Its spAutoFit only resizes the box when PowerPoint re-lays it out
+# during an edit -- not on open -- so long lines wrapped and the text sat low or
+# spilled off the slide until the operator dragged every box wider and
+# re-centered it. These constants let the builder do that up front.
+LINE_HEIGHT = 1.06  # rendered line height / font size (99pt lines are 1333698 EMU)
+CHAR_WIDTH = 0.45   # average glyph width / font size for the lyric font
+
+
+def frame_bounds(slide, fallback):
+    """(left, top, width, height) of the slide's decorative frame (the group
+    shape the text sits on), or of `fallback` when there is none."""
+    group = next((sh for sh in slide.shapes if sh.shape_type == MSO_SHAPE_TYPE.GROUP), None)
+    src = group or fallback
+    return src.left, src.top, src.width, src.height
+
+
+def estimate_lines(lines, width, size_emu):
+    """How many lines `lines` wrap to in a box `width` wide (greedy word wrap
+    with an average glyph width -- close enough to center the box)."""
+    cap = max(1, int(width / (size_emu * CHAR_WIDTH)))
+    total = 0
+    for line in lines:
+        count, cur = 1, 0
+        for word in line.split():
+            add = len(word) + (1 if cur else 0)
+            if cur and cur + add > cap:
+                count, cur = count + 1, len(word)
+            else:
+                cur += add
+        total += count
+    return total
+
+
+def fit_lyric_box(slide, box, slide_height, lines):
+    """Widen a lyric box to the frame and center it vertically for its text."""
+    size_emu = first_font_size(box)  # python-pptx font sizes are in EMU
+    if not size_emu:
+        return
+    left, top, width, _h = frame_bounds(slide, box)
+    height = int(estimate_lines(lines, width, size_emu) * size_emu * LINE_HEIGHT)
+    box.left, box.width, box.height = left, width, height
+    box.top = max(top, (slide_height - height) // 2)
+
+
 def build_title_slide(target, title_template, title_lines, subtitle_lines):
     s = clone_slide(title_template, target)
     boxes = get_textboxes(s)
@@ -384,7 +463,9 @@ def build_lyric_slides(target, lyric_template, sections, fmt=None):
             s = clone_slide(lyric_template, target)
             boxes = get_textboxes(s)
             if boxes:
-                set_textbox_lines(boxes[0], apply_format(chunk, fmt))
+                text = apply_format(chunk, fmt)
+                set_textbox_lines(boxes[0], text)
+                fit_lyric_box(s, boxes[0], target.slide_height, text)
 
 
 def build_two_tone_title(target, title_template, white_lines, cream_lines):
@@ -394,8 +475,21 @@ def build_two_tone_title(target, title_template, white_lines, cream_lines):
     s = clone_slide(title_template, target)
     boxes = get_textboxes(s)
     if len(boxes) >= 2:
-        set_textbox_lines(boxes[0], white_lines)
-        set_textbox_lines(boxes[1], cream_lines or [""])
+        white, cream = boxes[0], boxes[1]
+        set_textbox_lines(white, white_lines)
+        set_textbox_lines(cream, cream_lines or [""])
+        # Widen the small phrase to the frame so it stays on one line
+        # ("Temprano yo te"); the text is centered, so this doesn't move it.
+        left, _t, width, _h = frame_bounds(s, white)
+        white.left, white.width = left, width
+        if not cream_lines:
+            # One-word title ("Fidelidad"): set it at the big size, where the
+            # cream word would have been.
+            big = first_font_size(cream)
+            for p in white.text_frame.paragraphs:
+                for r in p.runs:
+                    r.font.size = big
+            white.top = int(cream.top - big * 0.18)
     elif boxes:
         set_textbox_lines(boxes[0], white_lines + cream_lines)
     return s
@@ -587,9 +681,13 @@ def build(spec_path):
             source_cache[path] = Presentation(path)
         return source_cache[path]
 
-    def render_song(white, cream, sections):
+    # Hymn lines are never re-broken or collapsed: the widened box wraps them,
+    # and the hymnal's wording is kept as printed.
+    hymn_fmt = {**DEFAULT_FORMAT, **(fmt or {}), "break_at": None, "collapse_repeats": False}
+
+    def render_song(white, cream, sections, verbatim=False):
         build_two_tone_title(target, song_title_slide, white, cream)
-        build_lyric_slides(target, lyric_slide, sections, fmt)
+        build_lyric_slides(target, lyric_slide, sections, "verbatim" if verbatim else fmt)
 
     for item in spec["items"]:
         op = item["op"]
@@ -610,18 +708,19 @@ def build(spec_path):
             )
             title = item.get("title") or hymn_title(raw) or f"Himno {page_no}"
             build_title_slide(target, title_slide, [title], [f"Himno {page_no}"])
-            build_lyric_slides(target, lyric_slide, sections, fmt)
+            build_lyric_slides(target, lyric_slide, sections, hymn_fmt)
 
         elif op == "library_song":  # backward-compatible alias of "song" by key
             entry = library[item["key"]]
             white, cream = entry_title_lines(entry)
-            render_song(white, cream, library_sections(entry))
+            render_song(white, cream, library_sections(entry), entry.get("verbatim", False))
 
         elif op == "song":
             if "key" in item:
                 entry = library[item["key"]]
                 white, cream = entry_title_lines(entry)
                 sections = library_sections(entry)
+                verbatim = entry.get("verbatim", False)
             else:
                 white = [item["title_white"]] if item.get("title_white") else []
                 cream = [item["title_cream"]] if item.get("title_cream") else []
@@ -629,7 +728,8 @@ def build(spec_path):
                     (s.get("type", "verse"), s["lines"], s.get("chunk_size", item.get("chunk_size", 2)))
                     for s in item["sections"]
                 ]
-            render_song(white, cream, sections)
+                verbatim = item.get("verbatim", False)
+            render_song(white, cream, sections, verbatim)
 
         elif op == "sermon":
             if sermon_slide is None:
