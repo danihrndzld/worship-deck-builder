@@ -144,15 +144,24 @@ def test_example_build_and_import_deck_roundtrip():
         titles = [s["title"] for s in songs]
         assert "Titulo Cancion" in titles  # the contemporary song was extracted
         assert not any("Himno" in t for t in titles)  # hymn/scripture skipped
-        # Lyric boxes are widened to the frame and centered vertically.
+        # Lyric boxes fill the frame with the text anchored at the middle,
+        # and every run is marked Spanish (Spain).
         prs = Presentation(str(out))
         for slide in prs.slides:
             boxes = B.get_textboxes(slide)
             if len(boxes) == 1 and boxes[0].text_frame.text.startswith("Linea uno"):
                 box = boxes[0]
-                left, _t, width, _h = B.frame_bounds(slide, box)
-                assert (box.left, box.width) == (left, width)
-                assert abs((box.top + box.height / 2) - prs.slide_height / 2) < 2
+                assert (box.left, box.top, box.width, box.height) == B.frame_bounds(slide, box)
+                body = box.text_frame._txBody.find(B.qn("a:bodyPr"))
+                assert body.get("anchor") == "ctr"
+                assert body.find(B.qn("a:spAutoFit")) is None
+            langs = {el.get("lang") for el in slide._element.iter(B.qn("a:rPr"))}
+            assert langs <= {"es-ES"}, langs
+        parts = [prs.part._element] + [m._element for m in prs.slide_masters] + [
+            l._element for m in prs.slide_masters for l in m.slide_layouts]
+        for root in parts:
+            assert {el.get("lang") for tag in ("a:rPr", "a:endParaRPr", "a:defRPr")
+                    for el in root.iter(B.qn(tag))} <= {"es-ES"}
 
 
 def test_sermon_boxes_map_by_layout_not_shape_order():

@@ -90,12 +90,13 @@ the `insert` command (below), which leaves every existing slide byte-identical.
 6. **Verify before Sunday.** Reopen the output with `python-pptx`, zip-integrity
    check it, and render to PDF/PNG (`soffice --headless --convert-to pdf`) to
    eyeball it. The chunking heuristic and any new song entries need a human look.
-   The template's text boxes use `spAutoFit` (the *box* grows to fit the text;
-   the font never shrinks), and PowerPoint only re-applies it when the text is
-   edited, not on open. So overflow in the soffice render is usually real. The
-   builder now widens every lyric box to the slide's frame and centers it
-   vertically for its line count, the way the operator used to fix each slide
-   by hand; if a slide still spills, split a line or re-chunk.
+   Every lyric box is set to the slide's whole frame with the text anchored at
+   its middle (`anchor="ctr"`, no autofit), so PowerPoint centers it vertically
+   however many lines it wraps to; every run is marked `es-ES` so the spell
+   checker doesn't red-underline the lyrics. The lyric font (Neue Montreal
+   Bold) isn't installed on this Mac, so soffice renders with a narrower
+   substitute and hides overflow: trust the build's `warning: may overflow the
+   frame` lines instead, and split those slides (2 lines each).
 7. **Learn from the operator's edits.** After the operator fixes the deck by hand,
    diff it against what you built and fold the fixes back in: re-save changed
    songs into the library (their final grouping, `chunk_size` 99 = one section per
