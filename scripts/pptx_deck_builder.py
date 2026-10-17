@@ -82,7 +82,35 @@ def clone_slide(source_slide, dest_prs, layout_name="Blank"):
         dst_spTree.append(new_child)
 
     _copy_slide_background(source_slide, new_slide)
+    set_language(new_slide)
     return new_slide
+
+
+LANG = "es-ES"  # Spanish (Spain): the template ships en-US, which red-underlines every lyric
+
+
+def set_language(slide, lang=LANG):
+    """Mark every text run, paragraph end and default run style as `lang`."""
+    set_element_language(slide._element, lang)
+
+
+def set_deck_language(prs, lang=LANG):
+    """Also set `lang` on the deck defaults, masters and layouts, so text the
+    operator types by hand is spell-checked in Spanish too."""
+    set_element_language(prs.part._element, lang)
+    for master in prs.slide_masters:
+        set_element_language(master._element, lang)
+        for layout in master.slide_layouts:
+            set_element_language(layout._element, lang)
+
+
+def set_element_language(root, lang=LANG):
+    for r in root.iter(qn("a:r")):
+        if r.find(qn("a:rPr")) is None:
+            r.insert(0, r.makeelement(qn("a:rPr"), {}))
+    for tag in ("a:rPr", "a:endParaRPr", "a:defRPr"):
+        for el in root.iter(qn(tag)):
+            el.set("lang", lang)
 
 
 def _copy_slide_background(source_slide, new_slide):
@@ -401,13 +429,14 @@ def entry_title_lines(entry):
 # Slide building
 # --------------------------------------------------------------------------
 
-# The template's lyric box is narrower than the slide's frame and has a fixed
-# height. Its spAutoFit only resizes the box when PowerPoint re-lays it out
-# during an edit -- not on open -- so long lines wrapped and the text sat low or
-# spilled off the slide until the operator dragged every box wider and
-# re-centered it. These constants let the builder do that up front.
+# The template's lyric box is narrower than the slide's frame, top-anchored and
+# spAutoFit, which PowerPoint only re-applies on edit -- not on open. Any guess
+# at the wrapped height put the text low or off the slide (the lyric font,
+# Neue Montreal Bold, is not installed here, so soffice renders hide it). So the
+# box is made the whole frame with the text anchored at its middle: PowerPoint
+# centers it vertically however many lines it wraps to.
 LINE_HEIGHT = 1.06  # rendered line height / font size (99pt lines are 1333698 EMU)
-CHAR_WIDTH = 0.45   # average glyph width / font size for the lyric font
+CHAR_WIDTH = 0.50   # average glyph width / font size for Neue Montreal Bold
 
 
 def frame_bounds(slide, fallback):
@@ -420,7 +449,7 @@ def frame_bounds(slide, fallback):
 
 def estimate_lines(lines, width, size_emu):
     """How many lines `lines` wrap to in a box `width` wide (greedy word wrap
-    with an average glyph width -- close enough to center the box)."""
+    with an average glyph width). Only used to warn about overflow."""
     cap = max(1, int(width / (size_emu * CHAR_WIDTH)))
     total = 0
     for line in lines:
@@ -435,15 +464,19 @@ def estimate_lines(lines, width, size_emu):
     return total
 
 
-def fit_lyric_box(slide, box, slide_height, lines):
-    """Widen a lyric box to the frame and center it vertically for its text."""
-    size_emu = first_font_size(box)  # python-pptx font sizes are in EMU
-    if not size_emu:
-        return
-    left, top, width, _h = frame_bounds(slide, box)
-    height = int(estimate_lines(lines, width, size_emu) * size_emu * LINE_HEIGHT)
-    box.left, box.width, box.height = left, width, height
-    box.top = max(top, (slide_height - height) // 2)
+def fit_lyric_box(slide, box, lines):
+    """Make a lyric box the frame, text centered vertically. Returns False when
+    the text likely doesn't fit the frame (split a line or re-chunk)."""
+    left, top, width, height = frame_bounds(slide, box)
+    box.left, box.top, box.width, box.height = left, top, width, height
+    body = box.text_frame._txBody.find(qn("a:bodyPr"))
+    body.set("anchor", "ctr")
+    for fit in list(body):
+        if fit.tag in (qn("a:spAutoFit"), qn("a:normAutofit"), qn("a:noAutofit")):
+            body.remove(fit)
+    body.append(body.makeelement(qn("a:noAutofit"), {}))
+    size_emu = first_font_size(box)
+    return not size_emu or estimate_lines(lines, width, size_emu) * size_emu * LINE_HEIGHT <= height
 
 
 def build_title_slide(target, title_template, title_lines, subtitle_lines):
@@ -465,7 +498,8 @@ def build_lyric_slides(target, lyric_template, sections, fmt=None):
             if boxes:
                 text = apply_format(chunk, fmt)
                 set_textbox_lines(boxes[0], text)
-                fit_lyric_box(s, boxes[0], target.slide_height, text)
+                if not fit_lyric_box(s, boxes[0], text):
+                    print(f"warning: may overflow the frame: {text[0]!r}")
 
 
 def build_two_tone_title(target, title_template, white_lines, cream_lines):
@@ -753,6 +787,7 @@ def build(spec_path):
         else:
             raise SystemExit(f"Unknown item op: {op!r}")
 
+    set_deck_language(target)
     target.save(spec["output"])
     print(f"wrote {spec['output']} ({len(list(target.slides))} slides)")
 
@@ -788,6 +823,7 @@ def insert_into_deck(spec_path):
             anchor = next(e for e in id_list if int(e.get("id")) == anchor_id)
             for e in list(id_list)[n_before:]:
                 anchor.addprevious(e)
+    set_deck_language(prs)
     prs.save(spec.get("output", spec["deck"]))
     print(f"wrote {spec.get('output', spec['deck'])} ({len(prs.slides)} slides, "
           f"{len(prs.slides) - len(original)} inserted)")
